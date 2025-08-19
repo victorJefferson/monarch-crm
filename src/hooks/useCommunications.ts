@@ -52,3 +52,13 @@ export const useCommunications = (params?: { lead_id?: number; created_by?: numb
     refetch,
   };
 };
+
+export const useCommunicationsFilter = (payload: { lead_ids?: number[]; created_by_ids?: number[] }) => {
+  const { data: communications = [], isLoading, error, refetch } = useQuery<Communication[]>({
+    queryKey: ['communications', 'filter', payload],
+    queryFn: () => communicationService.filter(payload),
+    enabled: Boolean((payload.lead_ids && payload.lead_ids.length) || (payload.created_by_ids && payload.created_by_ids.length)),
+    staleTime: 60 * 1000,
+  });
+  return { communications, loading: isLoading, error: error ? handleQueryError(error) : null, refetch };
+};

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useWorkItems, useTasks } from '../hooks/useWorkItems';
+import { useWorkItems, useTasks, useWorkItemsFilter } from '../hooks/useWorkItems';
 import { useCustomers } from '../hooks/useCustomers';
 import { useUsers } from '../hooks/useUsers';
 import TagInput, { TagOption } from '../components/TagInput';
@@ -112,9 +112,9 @@ const WorkItemTasks: React.FC<{ workItemId: number; customerId: number; userOpti
 
 const WorkItems: React.FC = () => {
   // Filters (single-select searchable dropdowns)
-  const [customerFilter, setCustomerFilter] = useState<number | string | null>(null);
-  const [userFilter, setUserFilter] = useState<number | string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<number | string | null>(null);
+  const [customerFilter, setCustomerFilter] = useState<(number | string)[] | null>(null);
+  const [userFilter, setUserFilter] = useState<(number | string)[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<(number | string)[] | null>(null);
 
   // Data sources
   const { customers } = useCustomers();
@@ -123,11 +123,13 @@ const WorkItems: React.FC = () => {
   const customerOptions: TagOption[] = useMemo(() => customers.map(c => ({ value: c.id, label: c.name })), [customers]);
   const userOptions: TagOption[] = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
 
-  const selectedCustomerId = customerFilter ? Number(customerFilter) : undefined;
-  const selectedUserId = userFilter ? Number(userFilter) : undefined;
-  const selectedStatusId = statusFilter ? Number(statusFilter) : undefined;
+  const toNumArray = (vals: (number | string)[] | null | undefined) => (vals || []).map(v => Number(v)).filter(n => Number.isFinite(n));
+  const customerIds = toNumArray(customerFilter);
+  const userIds = toNumArray(userFilter);
+  const statusIds = toNumArray(statusFilter);
 
-  const { workItems, addWorkItem, deleteWorkItem, updateWorkItem, statuses } = useWorkItems({ customer_id: selectedCustomerId, assigned_to: selectedUserId, status_id: selectedStatusId });
+  const { workItems, } = useWorkItemsFilter({ customer_ids: customerIds, assigned_to_ids: userIds, status_ids: statusIds });
+  const { addWorkItem, deleteWorkItem, updateWorkItem, statuses } = useWorkItems();
   const statusOptions: TagOption[] = useMemo(() => statuses.map(s => ({ value: s.id, label: s.name })), [statuses]);
 
   // Create and Edit Work Item Modals
@@ -194,31 +196,31 @@ const WorkItems: React.FC = () => {
         <div className="filters__group">
           <label className="form-label">Customer</label>
           <TagInput
-            value={customerFilter}
+            value={customerFilter || []}
             options={customerOptions}
-            multiple={false}
+            multiple
             placeholder="Search customer"
-            onChange={(v) => setCustomerFilter(Array.isArray(v) ? (v[0] ?? null) : v)}
+            onChange={(v) => setCustomerFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
           />
         </div>
         <div className="filters__group">
           <label className="form-label">User</label>
           <TagInput
-            value={userFilter}
+            value={userFilter || []}
             options={userOptions}
-            multiple={false}
+            multiple
             placeholder="Search user"
-            onChange={(v) => setUserFilter(Array.isArray(v) ? (v[0] ?? null) : v)}
+            onChange={(v) => setUserFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
           />
         </div>
         <div className="filters__group">
           <label className="form-label">Status</label>
           <TagInput
-            value={statusFilter}
+            value={statusFilter || []}
             options={statusOptions}
-            multiple={false}
+            multiple
             placeholder="Search status"
-            onChange={(v) => setStatusFilter(Array.isArray(v) ? (v[0] ?? null) : v)}
+            onChange={(v) => setStatusFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
           />
         </div>
       </div>

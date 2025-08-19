@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { workItemService, CreateWorkItemRequest, UpdateWorkItemRequest, CreateTaskRequest, UpdateTaskRequest, WorkStatus } from '../services/workItemService';
+import { workItemService, CreateWorkItemRequest, UpdateWorkItemRequest, CreateTaskRequest, UpdateTaskRequest, WorkStatus, WorkItem, Task } from '../services/workItemService';
 import { queryKeys, getInvalidationPatterns } from '../constants/queryKeys';
 import { handleQueryError } from '../lib/queryClient';
 
@@ -107,4 +107,23 @@ export const useTasks = (filters?: { customer_id?: number; work_item_id?: number
     deleteTask: (id: number) => deleteTaskMutation(id),
     refetch,
   };
+};
+
+// New multi-filter hooks for POST-based filtering used in UI filters
+export const useWorkItemsFilter = (payload: { customer_ids?: number[]; assigned_to_ids?: number[]; status_ids?: number[] }) => {
+  const { data: workItems = [], isLoading, error, refetch } = useQuery<WorkItem[]>({
+    queryKey: ['workItems', 'filter', payload],
+    queryFn: () => workItemService.filterWorkItems(payload),
+    staleTime: 60 * 1000,
+  });
+  return { workItems, loading: isLoading, error: error ? handleQueryError(error) : null, refetch };
+};
+
+export const useTasksFilter = (payload: { customer_ids?: number[]; work_item_ids?: number[]; assigned_to_ids?: number[]; status_ids?: number[] }) => {
+  const { data: tasks = [], isLoading, error, refetch } = useQuery<Task[]>({
+    queryKey: ['tasks', 'filter', payload],
+    queryFn: () => workItemService.filterTasks(payload),
+    staleTime: 60 * 1000,
+  });
+  return { tasks, loading: isLoading, error: error ? handleQueryError(error) : null, refetch };
 };

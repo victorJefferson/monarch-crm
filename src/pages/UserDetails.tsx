@@ -3,11 +3,11 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { API_BASE_URL, AUTH_TOKEN_KEY } from '../config/env';
 import { queryKeys } from '../constants/queryKeys';
-import { useWorkItems, useTasks } from '../hooks/useWorkItems';
+import { useWorkItemsFilter, useTasksFilter } from '../hooks/useWorkItems';
 import { useLeads } from '../hooks/useLeads';
 import TagInput from '../components/TagInput';
 import ChatThread, { ChatMessage } from '../components/ChatThread';
-import { useCommunications } from '../hooks/useCommunications';
+import { useCommunicationsFilter } from '../hooks/useCommunications';
 
 const getAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -32,13 +32,16 @@ const UserDetails: React.FC = () => {
   const { leads } = useLeads();
 
   // Unified filter for Work Items, Tasks, and Conversations (Lead/Customer)
-  const [customerFilter, setCustomerFilter] = useState<number | null>(null);
+  const [customerFilter, setCustomerFilter] = useState<(number | string)[] | null>(null);
   const customerOptions = useMemo(() => (leads || []).map(l => ({ value: l.id, label: l.name })), [leads]);
 
-  const { workItems } = useWorkItems({ assigned_to: userId, customer_id: customerFilter ?? undefined });
-  const { tasks } = useTasks({ assigned_to: userId, customer_id: customerFilter ?? undefined });
+  const toNumArray = (vals: (number | string)[] | null | undefined) => (vals || []).map(v => Number(v)).filter(n => Number.isFinite(n));
+  const customerIds = toNumArray(customerFilter);
+
+  const { workItems } = useWorkItemsFilter({ assigned_to_ids: [userId], customer_ids: customerIds });
+  const { tasks } = useTasksFilter({ assigned_to_ids: [userId], customer_ids: customerIds });
   // Communications created by this user; optionally filter by selected lead/customer (unified filter)
-  const { communications } = useCommunications({ created_by: userId, lead_id: customerFilter ?? undefined });
+  const { communications } = useCommunicationsFilter({ created_by_ids: [userId], lead_ids: customerIds });
   const messages: ChatMessage[] = communications.map(c => ({ id: c.id, text: c.message, date: c.created_at, authorName: (leads || []).find(l => l.id === c.lead_id)?.name || 'Customer' }));
 
   return (
@@ -53,14 +56,10 @@ const UserDetails: React.FC = () => {
           <div style={{ minWidth: 260 }}>
             <label className="form-label" style={{ display: 'block', marginBottom: 6 }}>Filter Work Items & Tasks by Customer</label>
             <TagInput
-              value={customerFilter}
+              value={customerFilter || []}
               options={customerOptions}
-              multiple={false}
-              onChange={(v) => {
-                const next = Array.isArray(v) ? (v[0] ?? null) : v;
-                const num = next != null ? Number(next) : null;
-                setCustomerFilter(Number.isFinite(num as any) ? (num as number) : null);
-              }}
+              multiple
+              onChange={(v) => setCustomerFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
               placeholder="All customers"
             />
           </div>

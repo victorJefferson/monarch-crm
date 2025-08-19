@@ -2,10 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leadService, Lead as BaseLead } from '../services/leadService';
-import { useWorkItems, useTasks } from '../hooks/useWorkItems';
+import { useWorkItemsFilter, useTasksFilter } from '../hooks/useWorkItems';
 import { useUsers } from '../hooks/useUsers';
 // import StatusBadge from '../components/StatusBadge';
-import { useCommunications } from '../hooks/useCommunications';
+import { useCommunications, useCommunicationsFilter } from '../hooks/useCommunications';
 import ChatThread, { ChatMessage } from '../components/ChatThread';
 import TagInput from '../components/TagInput';
 
@@ -17,13 +17,17 @@ const LeadDetails: React.FC = () => {
   const leadId = Number(id);
 
   const { data: lead, isLoading, error } = useQuery<Lead>({ queryKey: ['lead', 'detail', leadId], queryFn: () => leadService.getLeadById(leadId) as Promise<Lead>, enabled: Number.isFinite(leadId) });
-  const [userFilter, setUserFilter] = useState<number | null>(null);
+  const [userFilter, setUserFilter] = useState<(number | string)[] | null>(null);
   const { users } = useUsers();
   const userOptions = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
 
-  const { workItems } = useWorkItems({ customer_id: leadId, assigned_to: userFilter ?? undefined });
-  const { tasks } = useTasks({ customer_id: leadId, assigned_to: userFilter ?? undefined });
-  const { communications, addMessage, deleteMessage } = useCommunications({ lead_id: leadId, created_by: userFilter ?? undefined });
+  const toNumArray = (vals: (number | string)[] | null | undefined) => (vals || []).map(v => Number(v)).filter(n => Number.isFinite(n));
+  const userIds = toNumArray(userFilter);
+
+  const { workItems } = useWorkItemsFilter({ customer_ids: [leadId], assigned_to_ids: userIds });
+  const { tasks } = useTasksFilter({ customer_ids: [leadId], assigned_to_ids: userIds });
+  const { communications } = useCommunicationsFilter({ lead_ids: [leadId], created_by_ids: userIds });
+  const { addMessage, deleteMessage } = useCommunications();
 
   // Prepare chat messages as a hook before any early returns to keep hook order stable
   const chatMessages: ChatMessage[] = useMemo(() => communications.map(c => ({
@@ -53,14 +57,10 @@ const LeadDetails: React.FC = () => {
             <div>
               <label className="form-label" style={{ display: 'block', marginBottom: 6 }}>Filter by User</label>
               <TagInput
-                value={userFilter}
+                value={userFilter || []}
                 options={userOptions}
-                multiple={false}
-                onChange={(v) => {
-                  const next = Array.isArray(v) ? (v[0] ?? null) : v;
-                  const num = next != null ? Number(next) : null;
-                  setUserFilter(Number.isFinite(num as any) ? (num as number) : null);
-                }}
+                multiple
+                onChange={(v) => setUserFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
                 placeholder="All users"
               />
             </div>

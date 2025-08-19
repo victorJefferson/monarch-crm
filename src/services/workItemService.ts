@@ -108,6 +108,10 @@ class WorkItemService {
     const res = await fetch(`${API_BASE_URL}/work-items?${q.toString()}`, { headers: getAuthHeaders() });
     return handleResponse<WorkItem[]>(res);
   }
+  async filterWorkItems(payload: { customer_ids?: number[]; assigned_to_ids?: number[]; status_ids?: number[] }): Promise<WorkItem[]> {
+    const res = await fetch(`${API_BASE_URL}/work-items/filter`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    return handleResponse<WorkItem[]>(res);
+  }
   async getWorkItem(id: number): Promise<WorkItem> {
     const res = await fetch(`${API_BASE_URL}/work-items/${id}`, { headers: getAuthHeaders() });
     return handleResponse<WorkItem>(res);
@@ -134,6 +138,10 @@ class WorkItemService {
     const res = await fetch(`${API_BASE_URL}/tasks?${q.toString()}`, { headers: getAuthHeaders() });
     return handleResponse<Task[]>(res);
     }
+  async filterTasks(payload: { customer_ids?: number[]; work_item_ids?: number[]; assigned_to_ids?: number[]; status_ids?: number[] }): Promise<Task[]> {
+    const res = await fetch(`${API_BASE_URL}/tasks/filter`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    return handleResponse<Task[]>(res);
+  }
   async createTask(payload: CreateTaskRequest): Promise<Task> {
     const res = await fetch(`${API_BASE_URL}/tasks`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
     return handleResponse<Task>(res);

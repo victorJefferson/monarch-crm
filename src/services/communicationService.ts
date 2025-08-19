@@ -43,6 +43,10 @@ class CommunicationService {
     const res = await fetch(`${API_BASE_URL}/communications?${q.toString()}`, { headers: getAuthHeaders() });
     return handleResponse<Communication[]>(res);
   }
+  async filter(payload: { lead_ids?: number[]; created_by_ids?: number[] }): Promise<Communication[]> {
+    const res = await fetch(`${API_BASE_URL}/communications/filter`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    return handleResponse<Communication[]>(res);
+  }
   async create(payload: CreateCommunicationRequest): Promise<Communication> {
     const res = await fetch(`${API_BASE_URL}/communications`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
     return handleResponse<Communication>(res);

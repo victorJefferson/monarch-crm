@@ -1,12 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { useWorkItems, useTasks } from '../hooks/useWorkItems';
+import { useWorkItems, useWorkItemsFilter, useTasksFilter } from '../hooks/useWorkItems';
 import { useCustomers } from '../hooks/useCustomers';
 import { useUsers } from '../hooks/useUsers';
 import TagInput, { TagOption } from '../components/TagInput';
+import { API_BASE_URL } from '../config/env';
+import { AUTH_TOKEN_KEY } from '../config/env';
 
 const Kanban: React.FC = () => {
-  const [customerFilter, setCustomerFilter] = useState<number | string | null>(null);
-  const [userFilter, setUserFilter] = useState<number | string | null>(null);
+  const [customerFilter, setCustomerFilter] = useState<(number | string)[] | null>(null);
+  const [userFilter, setUserFilter] = useState<(number | string)[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<(number | string)[] | null>(null);
 
   const { customers } = useCustomers();
   const { users } = useUsers();
@@ -14,11 +17,14 @@ const Kanban: React.FC = () => {
   const customerOptions: TagOption[] = useMemo(() => customers.map(c => ({ value: c.id, label: c.name })), [customers]);
   const userOptions: TagOption[] = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
 
-  const selectedCustomerId = customerFilter ? Number(customerFilter) : undefined;
-  const selectedUserId = userFilter ? Number(userFilter) : undefined;
+  const toNumArray = (vals: (number | string)[] | null | undefined) => (vals || []).map(v => Number(v)).filter(n => Number.isFinite(n));
+  const customerIds = toNumArray(customerFilter);
+  const userIds = toNumArray(userFilter);
+  const statusIds = toNumArray(statusFilter);
 
-  const { statuses, workItems, updateWorkItem } = useWorkItems({ customer_id: selectedCustomerId, assigned_to: selectedUserId });
-  const { tasks, updateTask } = useTasks({ customer_id: selectedCustomerId, assigned_to: selectedUserId });
+  const { statuses, updateWorkItem } = useWorkItems();
+  const { workItems } = useWorkItemsFilter({ customer_ids: customerIds, assigned_to_ids: userIds, status_ids: statusIds });
+  const { tasks } = useTasksFilter({ customer_ids: customerIds, assigned_to_ids: userIds, status_ids: statusIds });
 
   const toDoStatusId = useMemo(() => statuses.find(s => s.name.toLowerCase() === 'to do')?.id, [statuses]);
 
@@ -40,7 +46,9 @@ const Kanban: React.FC = () => {
       if (parsed.type === 'workItem') {
         await updateWorkItem(parsed.id, { status_id: statusId });
       } else {
-        await updateTask(parsed.id, { status_id: statusId });
+        // Update task status via direct API call to tasks service to keep board in sync
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        await fetch(`${API_BASE_URL}/tasks/${parsed.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' }, body: JSON.stringify({ status_id: statusId }) });
       }
     } catch {
       // ignore
@@ -50,8 +58,12 @@ const Kanban: React.FC = () => {
   const itemsByStatus = (statusId: number) => workItems.filter(w => (w.status_id ?? toDoStatusId) === statusId);
   const tasksByStatus = (statusId: number) => tasks.filter(t => (t.status_id ?? toDoStatusId) === statusId);
 
-  const cancelled = useMemo(() => statuses.find(s => s.name.toLowerCase() === 'cancelled') || null, [statuses]);
-  const topStatuses = useMemo(() => statuses.filter(s => s.name.toLowerCase() !== 'cancelled'), [statuses]);
+  const filteredStatuses = useMemo(() => {
+    if (!statusIds.length) return statuses;
+    return statuses.filter(s => statusIds.includes(s.id));
+  }, [statuses, statusIds]);
+  const cancelled = useMemo(() => filteredStatuses.find(s => s.name.toLowerCase() === 'cancelled') || null, [filteredStatuses]);
+  const topStatuses = useMemo(() => filteredStatuses.filter(s => s.name.toLowerCase() !== 'cancelled'), [filteredStatuses]);
 
   const renderColumn = (statusId: number, statusName: string) => (
     <div key={statusId} className={`kanban__column ${statusName.toLowerCase() === 'cancelled' ? 'kanban__column--cancelled' : ''}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, statusId)}>
@@ -104,21 +116,31 @@ const Kanban: React.FC = () => {
         <div className="filters__group">
           <label className="form-label">Customer</label>
           <TagInput
-            value={customerFilter}
+            value={customerFilter || []}
             options={customerOptions}
-            multiple={false}
+            multiple
             placeholder="Filter by customer"
-            onChange={(v) => setCustomerFilter(Array.isArray(v) ? (v[0] ?? null) : v)}
+            onChange={(v) => setCustomerFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
           />
         </div>
         <div className="filters__group">
           <label className="form-label">User</label>
           <TagInput
-            value={userFilter}
+            value={userFilter || []}
             options={userOptions}
-            multiple={false}
+            multiple
             placeholder="Filter by user"
-            onChange={(v) => setUserFilter(Array.isArray(v) ? (v[0] ?? null) : v)}
+            onChange={(v) => setUserFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
+          />
+        </div>
+        <div className="filters__group">
+          <label className="form-label">Status</label>
+          <TagInput
+            value={statusFilter || []}
+            options={statuses.map(s => ({ value: s.id, label: s.name }))}
+            multiple
+            placeholder="Filter by status"
+            onChange={(v) => setStatusFilter(Array.isArray(v) ? v : (v != null ? [v] : []))}
           />
         </div>
       </div>
